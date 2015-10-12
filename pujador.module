@@ -1,0 +1,218 @@
+<?php
+
+//Variables globales
+$obras = [];
+
+/*
+  Gestiona los permisos del módulo
+ */
+
+function pujador_permission() {
+    return array(
+        'edit my settings' => array(
+            'title' => t('Edit My Settings'),
+            'description' => t('Edit My Custom Settings Page'),
+        ),
+    );
+}
+
+/*
+ * Menú del formulario
+ */
+
+function pujador_menu() {
+    $items = array();
+    //Página donde se cargará el formulario
+    $items['pujador'] = array(
+        'title' => 'Pujador',
+        'description' => 'Formulario para realizar una puja',
+        'page callback' => 'drupal_get_form',
+        'page arguments' => array('pujador_form'),
+        'access callback' => TRUE
+    );
+    return $items;
+}
+
+/**
+ * Creación del formulario
+ * @param type $form
+ * @param type $form_state
+ * @return type
+ */
+function pujador_form($form, &$form_state) {
+    //Carga la obra por la que se va a pujar
+    $obra_id = $form_state['build_info']['args'][0];
+    $obra = node_load($obra_id);
+
+    //Imagen del cuadro    
+    $img_url = $obra->field_foto['und'][0]['uri'];
+    $form['imagen'] = array(
+        '#type' => 'item',
+        '#title' => $obra->title,
+        '#markup' => '<img src=' . image_style_url("large", $img_url) . '></img>',
+    );
+
+    //Fecha límite para pujar
+    $form['fecha_limite'] = array(
+        '#type' => 'item',
+        '#title' => 'Fecha límite para pujar:',
+        '#markup' => field_get_items('node', $obra, 'field_fecha_limite')[0]['value'],
+    );
+
+    $consulta = new EntityFieldQuery();
+    $nodos = $consulta->entityCondition('entity_type', 'node')
+            ->propertyCondition('type', 'obra')
+            ->fieldCondition('field_estado', 'value', 'subasta', '=')
+            ->execute();
+    global $obras;
+    $titulos = [];
+    //Comprueba si se ha devuelto alguna obra, si es así se añade al desplegable
+    if (!empty($nodos['node'])) {
+        foreach ($nodos['node'] as $valor) {
+            $obraTemporal = node_load($valor->nid);
+            $obras[] = $obraTemporal;
+            $titulos[] = $obraTemporal->title;
+        }
+    } else {
+        $obras[] = 'Ninguna obra disponible';
+    }
+
+    //Precio actual
+    $precio_actual = field_get_items('node', $obra, 'field_pvp')[0]['value'];
+    $form['precio_actual'] = array(
+        '#type' => 'item',
+        '#title' => t('Precio Actual'),
+        '#markup' => $precio_actual == NULL ? '-' : $precio_actual . '€',
+    );
+    
+    //Máximo pujador
+    $maximo_pujador = field_get_items('node', $obra, 'field_maximo_pujador')[0]['value'];
+    $form['maximo_pujador'] = array(
+        '#type' => 'item',
+        '#title' => t('Máximo pujador'),
+        '#markup' => $maximo_pujador == NULL ? 'Aún sin pujador' : $maximo_pujador,
+    );
+
+    //Puja
+    $form['puja'] = array(
+        '#type' => 'textfield',
+        '#title' => 'Precio de la puja',
+        '#size' => 10,
+        '#maxlength' => 10,
+        '#required' => TRUE, //Obligatorio
+    );
+
+    //Botón de envío
+    $form['boton_enviar'] = array(
+        '#type' => 'submit',
+        '#value' => t('Enviar'),
+    );
+
+    return $form;
+}
+
+/**
+ * Función que se lanza cada vez que varía el campo del desplegable
+ * @param array $form
+ * @param type $form_state
+ */
+//function cambio_select($form, &$form_state) {
+//    global $obras;
+//    $precio_actual = field_get_items('node', $obras[$form_state['values']['titulos']], 'field_pvp')[0]['value'];
+//    //$form_state['complete form']['precio_actual']['#markup'] = $precio_actual == NULL ? '-' : $precio_actual . '€';
+//    $form['precio_actual']['#markup'] = $precio_actual == NULL ? '-' : $precio_actual . '€';
+//    //$form_state['rebuild'] = TRUE;
+//    return $form['precio_actual'];
+//}
+
+/*
+ * Valida el formulario
+ */
+
+function pujador_form_validate($form, &$form_state) {
+    
+}
+
+/*
+ * Comportamiento del formulario
+ */
+
+function pujador_form_submit($form, &$form_state) {
+    print $form;
+}
+
+/**
+ * Añade un link para acceder al formulario de puja, solo para las obras que estén en subasta
+ * @param type $build
+ */
+function pujador_node_view_alter(&$build) {
+    if (field_get_items('node', $build['#node'], 'field_estado')[0]['value'] == 'subasta') {
+        $build['links']['node']['#links']['link-pujador'] = array(
+            'title' => t('Pujar Obra'),
+            'href' => 'pujador/' . $build['#node']->vid,
+            'html' => TRUE,
+            'attributes' => array(
+                'title' => 'Pujador',
+            ),
+        );
+    }
+}
+
+/**
+ * Función que se ejecuta periódicamente. Comprueba el estado
+ * de las obras que estén en subasta. Si el tiempo máximo para pujar se ha sobrepasado,
+ * se asigna la obra como vendida (en caso de tener alguna puja) o como no vendida, en caso contrario
+ */
+function pujador_cron() {
+    $consulta = new EntityFieldQuery();
+    $nodos = $consulta->entityCondition('entity_type', 'node')
+            ->propertyCondition('type', 'obra')
+            ->fieldCondition('field_estado', 'value', 'subasta', '=')
+            ->execute();
+    if (!empty($nodos['node'])) {
+        foreach ($nodos['node'] as $valor) {
+            $obra = node_load($valor->nid);
+            //Determina si la puja ha excedido su tiempo límite
+            $field_fecha_limite = field_get_items('node', $obra, 'field_fecha_limite')[0]['value'];
+            $tiempo_limite = new DateTime($field_fecha_limite);
+            $ahora = new Datetime('now');
+            $precio_actual = field_get_items('node', $obra, 'field_pvp')[0][value];
+            if ($ahora > $tiempo_limite && $precio_actual != null) {
+                //Comportamiento si la obra ha sido vendida
+                $tiempo_limite = null;
+                $texto_log = "El tiempo de puja para la obra " . $obra->title . " ha excedido, la obra pasa a no vendida";
+                actualizar_campo($obra, 'vendido', 'estado');
+            } else if ($ahora > $tiempo_limite && $precio_actual === null) {
+                //Comportamiento si la hora no ha recibido ninguna puja
+                $tiempo_limite = null;
+                $texto_log = "El tiempo de puja para la obra " . $obra->title . " ha excedido, la obra pasa vendida";
+                actualizar_campo($obra, 'noVendido', 'estado');
+            }
+            if ($texto_log) {
+                watchdog('Pujador', $texto_log);
+                actualizar_campo($obra, 0, 'en_venta');
+            }
+        }
+    }
+}
+
+//Métodos auxiliares
+
+/**
+ * Actualiza el campo de una obra
+ * @param type $obra
+ * @param type $nuevo_valor
+ * @param type $campo
+ */
+function actualizar_campo(&$obra, $nuevo_valor, $campo) {
+    switch ($campo) {
+        case 'estado':
+            $obra->field_estado[LANGUAGE_NONE][0]['value'] = $nuevo_valor;
+            break;
+        case 'en_venta':
+            $obra->field_en_venta[LANGUAGE_NONE][0]['value'] = $nuevo_valor;
+            break;
+    }
+    //actualiza el nodo en base de datos
+    field_attach_update('node', $obra);
+}

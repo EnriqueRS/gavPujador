@@ -1,0 +1,14 @@
+<?php
+
+function pujador_field_schema($field) {
+  $schema = array(
+    'columns' => array(
+      'cantidad_puja' => array(
+        'type' => 'int',
+        'not null' => FALSE,
+        'length' => 11,
+      ),
+    ),
+  );
+  return $schema;
+}
