@@ -1,5 +1,6 @@
 <?php
-
+//Archivo de configuración
+include("configuracion.php");
 //Variables globales
 $obras = [];
 
@@ -84,7 +85,7 @@ function pujador_form($form, &$form_state) {
         '#title' => t('Precio Actual'),
         '#markup' => $precio_actual == NULL ? '-' : $precio_actual . '€',
     );
-    
+
     //Máximo pujador
     $maximo_pujador = field_get_items('node', $obra, 'field_maximo_pujador')[0]['value'];
     $form['maximo_pujador'] = array(
@@ -94,14 +95,14 @@ function pujador_form($form, &$form_state) {
     );
 
     //Puja
-    $form['puja'] = array(
+    $form['cantidad'] = array(
         '#type' => 'textfield',
         '#title' => 'Precio de la puja',
         '#size' => 10,
         '#maxlength' => 10,
         '#required' => TRUE, //Obligatorio
     );
-
+    
     //Botón de envío
     $form['boton_enviar'] = array(
         '#type' => 'submit',
@@ -110,20 +111,6 @@ function pujador_form($form, &$form_state) {
 
     return $form;
 }
-
-/**
- * Función que se lanza cada vez que varía el campo del desplegable
- * @param array $form
- * @param type $form_state
- */
-//function cambio_select($form, &$form_state) {
-//    global $obras;
-//    $precio_actual = field_get_items('node', $obras[$form_state['values']['titulos']], 'field_pvp')[0]['value'];
-//    //$form_state['complete form']['precio_actual']['#markup'] = $precio_actual == NULL ? '-' : $precio_actual . '€';
-//    $form['precio_actual']['#markup'] = $precio_actual == NULL ? '-' : $precio_actual . '€';
-//    //$form_state['rebuild'] = TRUE;
-//    return $form['precio_actual'];
-//}
 
 /*
  * Valida el formulario
@@ -138,7 +125,32 @@ function pujador_form_validate($form, &$form_state) {
  */
 
 function pujador_form_submit($form, &$form_state) {
-    print $form;
+    $metodo = 'POST';
+    $url = Configuracion::URL_BASE.  Configuracion::URL_PUJAR;
+    $datos = new StdClass();
+    global $user;
+    $datos->usuario = floatval($user->uid);
+    $datos->obra = floatval($form_state['build_info']['args'][0]);
+    $datos->cantidad = floatval($form_state['input']['cantidad']);
+    $json = json_encode($datos);
+    $cabecera = array(
+        'Accept' => 'application/json',
+    );
+    $opciones = array(
+        'headers' => $cabecera,
+        'method' => $metodo,
+        'data' => $json
+    );
+    $respuesta = drupal_http_request($url, $opciones);
+    $respuestaJson = json_decode($respuesta->data);
+    if ($respuestaJson->Resultado == "OK") {
+        //Vacía caché
+        field_cache_clear();
+        $tipoMensaje = 'status';
+    } else {
+        $tipoMensaje = 'error';
+    }
+    drupal_set_message(t($respuestaJson->Mensaje), $tipoMensaje);
 }
 
 /**
