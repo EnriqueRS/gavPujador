@@ -100,6 +100,7 @@ function pujador_form($form, &$form_state) {
         '#title' => 'Precio de la puja',
         '#size' => 10,
         '#maxlength' => 10,
+        '#field_suffix' => '€',
         '#required' => TRUE, //Obligatorio
     );
     
@@ -110,14 +111,6 @@ function pujador_form($form, &$form_state) {
     );
 
     return $form;
-}
-
-/*
- * Valida el formulario
- */
-
-function pujador_form_validate($form, &$form_state) {
-    
 }
 
 /*
