@@ -1,4 +1,5 @@
 <?php
+
 //Archivo de configuración
 include("configuracion.php");
 //Variables globales
@@ -186,19 +187,19 @@ function pujador_cron() {
             $field_fecha_limite = field_get_items('node', $obra, 'field_fecha_limite')[0]['value'];
             $tiempo_limite = new DateTime($field_fecha_limite);
             $ahora = new Datetime('now');
-            $precio_actual = field_get_items('node', $obra, 'field_pvp')[0][value];
-            if ($ahora > $tiempo_limite && $precio_actual != null) {
+            $maximo_pujador = field_get_items('node', $obra, 'field_maximo_pujador')[0]['value'];
+            if ($ahora > $tiempo_limite && $maximo_pujador != 'Aún sin puja') {
                 //Comportamiento si la obra ha sido vendida
                 $tiempo_limite = null;
-                $texto_log = "El tiempo de puja para la obra " . $obra->title . " ha excedido, la obra pasa a no vendida";
+                $texto_log = "El tiempo de puja para la obra " . $obra->title . " ha excedido, la obra pasa a vendida";
                 actualizar_campo($obra, 'vendido', 'estado');
-            } else if ($ahora > $tiempo_limite && $precio_actual === null) {
+            } else if ($ahora > $tiempo_limite && $maximo_pujador === 'Aún sin puja') {
                 //Comportamiento si la hora no ha recibido ninguna puja
                 $tiempo_limite = null;
-                $texto_log = "El tiempo de puja para la obra " . $obra->title . " ha excedido, la obra pasa vendida";
+                $texto_log = "El tiempo de puja para la obra " . $obra->title . " ha excedido, la obra pasa a no vendida";
                 actualizar_campo($obra, 'noVendido', 'estado');
             }
-            if ($texto_log) {
+            if (isset($texto_log)) {
                 watchdog('Pujador', $texto_log);
                 actualizar_campo($obra, 0, 'en_venta');
             }
