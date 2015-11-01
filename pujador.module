@@ -187,15 +187,13 @@ function pujador_cron() {
             $field_fecha_limite = field_get_items('node', $obra, 'field_fecha_limite')[0]['value'];
             $tiempo_limite = new DateTime($field_fecha_limite);
             $ahora = new Datetime('now');
-            $maximo_pujador = field_get_items('node', $obra, 'field_maximo_pujador')[0]['value'];
-            if ($ahora > $tiempo_limite && $maximo_pujador != 'Aún sin puja') {
+            $maximo_pujador_id = field_get_items('node', $obra, 'field_maximo_pujador_id')[0]['value'];
+            if ($ahora > $tiempo_limite && $maximo_pujador_id != 0) {
                 //Comportamiento si la obra ha sido vendida
-                $tiempo_limite = null;
                 $texto_log = "El tiempo de puja para la obra " . $obra->title . " ha excedido, la obra pasa a vendida";
                 actualizar_campo($obra, 'vendido', 'estado');
-            } else if ($ahora > $tiempo_limite && $maximo_pujador === 'Aún sin puja') {
+            } else if ($ahora > $tiempo_limite && $maximo_pujador_id == 0) {
                 //Comportamiento si la hora no ha recibido ninguna puja
-                $tiempo_limite = null;
                 $texto_log = "El tiempo de puja para la obra " . $obra->title . " ha excedido, la obra pasa a no vendida";
                 actualizar_campo($obra, 'noVendido', 'estado');
             }

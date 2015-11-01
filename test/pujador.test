@@ -1,0 +1,126 @@
+<?php
+
+class TestPujador extends DrupalWebTestCase {
+
+    public static function getInfo() {
+        return array(
+            'name' => t('Test de Pujador'),
+            'description' => t('Funcionalidad del módulo Pujador'),
+            'group' => 'Pujador',
+        );
+    }
+
+    /**
+     * Operaciones previas al test
+     */
+    function setUp() {
+        //Se asegura de que el módulo pujador está habilitado
+        parent::setUp(array('pujador'));
+        //Realiza el login con un usuario con privilegios de administrador
+        $this->privilegedUser = $this->drupalCreateUser(array('create obra content', 'extra special edit any obra'));
+        $this->drupalLogin($this->privilegedUser);
+    }
+
+    /**
+     * Prueba que verifica que una obra pasa al estado vendido cuando se ha pujado y ha excedido el tiempo límite
+     */
+    function notestObraVendida() {        
+        //Se crea una fecha límite anterior a la actual
+        //Para provocar la actuación del cron
+        $fechaLimite = getFechaAnterior();
+        debug($fechaLimite, 'Fecha Límite', true);
+        //Crea una obra de prueba, con un ID de usuario como máximo pujador
+        $obra = crearObra(5, $fechaLimite);
+        debug($obra->field_estado[LANGUAGE_NONE][0][value], 'Estado actual', true);
+        //Ejecuta la función cron del módulo pujador
+        $this->pujador_cron();
+        //Comprueba que el estado de la obra ha pasado a vendido
+        $this->assertEqual($obra->field_estado[LANGUAGE_NONE][0][value],'vendido', 'La obra ha de tener el estado vendido');
+        debug($obra->field_estado[LANGUAGE_NONE][0][value], 'Estado actual', true);
+    }
+
+    /**
+     * Prueba que verifica que una obra pasa al estado no vendido cuando no se ha pujado y ha excedido el tiempo límite
+     */
+    function notestObraNoVendida() {        
+        //Se crea una fecha límite anterior a la actual
+        //Para provocar la actuación del cron
+        $fechaLimite = getFechaAnterior();
+        debug($fechaLimite, 'Fecha Límite', true);
+        //Crea una obra de prueba, Con el ID del usuario máximo pujador por defecto, es decir,
+        //no ha recibido puja ninguna
+        $obra = crearObra(0, $fechaLimite);
+        debug($obra->field_estado[LANGUAGE_NONE][0][value], 'Estado actual', true);
+        //Ejecuta la función cron del módulo pujador
+        $this->pujador_cron();
+        //Comprueba que el estado de la obra ha pasado a vendido
+        $this->assertEqual($obra->field_estado[LANGUAGE_NONE][0][value],'noVendido', 'La obra ha de tener el estado no vendido');
+        debug($obra->field_estado[LANGUAGE_NONE][0][value], 'Estado actual', true);
+    }
+    
+    /**
+     * Prueba que verifica que el estado de una obra no cambia cuando la fecha límite aún no ha excedido
+     */
+    function notestObraNoExcedida() {        
+        //Se crea una fecha límite posterior a la actual
+        $fechaLimite = getFechaPosterior();
+        debug($fechaLimite, 'Fecha Límite', true);
+        //Crea una obra de prueba, el ID del máximo pujador es irrelevante
+        $obra = crearObra(0, $fechaLimite);
+        debug($obra->field_estado[LANGUAGE_NONE][0][value], 'Estado actual', true);
+        //Ejecuta la función cron del módulo pujador
+        $this->pujador_cron();
+        //Comprueba que el estado de la obra no ha variado
+        $this->assertEqual($obra->field_estado[LANGUAGE_NONE][0][value],'noVendido', 'La obra ha de tener el estado no vendido');
+        debug($obra->field_estado[LANGUAGE_NONE][0][value], 'Estado actual', true);
+    }
+    
+    /**
+     * Devuelve la fecha de ayer
+     * @return type
+     */
+    private function getFechaAnterior(){
+        $fechaAhora = date('Y-m-j G:i:s');
+        debug($fechaAhora, 'Fecha Actual', true);
+        $fechaAnterior = strtotime('-1 day', strtotime($fechaAhora));
+        $fechaAnterior = date('Y-m-j G:i:s', $fechaAnterior);
+        return $fechaAnterior;
+    }
+    
+    /**
+     * Devuelve la fecha mañana
+     * @return type
+     */
+    private function getFechaPosterior(){
+        $fechaAhora = date('Y-m-j G:i:s');
+        debug($fechaAhora, 'Fecha Actual', true);
+        $fechaPosterior = strtotime('+1 day', strtotime($fechaAhora));
+        $fechaPosterior = date('Y-m-j G:i:s', $fechaPosterior);
+        return $fechaPosterior;
+    }
+    
+    /**
+     * Crea y devuelve una obra de prueba
+     * @param type $idMaximoPujador - Indica el id del usuario máximo pujador, 0 -> Aún no ha recibido puja
+     * @param type $fechaLimite
+     * @return type
+     */
+    private function crearObra($idMaximoPujador, $fechaLimite){
+        $edit = array();
+        $edit['title'] = $this->randomName(8);
+        $edit["body[und][0][value]"] = $this->randomName(16);
+        $this->drupalPost('node/add/obra', $edit, t('Save'));
+        $obra_contenido = array(
+            'type' => 'obra',
+            'title' => 'Obra de prueba',
+            'body' => 'Esta obra ha sido creada para la batería de pruebas',
+            'field_estado[LANGUAGE_NONE][0][value]' => 'subasta',
+            'field_fecha_limite[LANGUAGE_NONE][0][value]' => $fechaLimite,
+            'field_maximo_pujador_id[LANGUAGE_NONE][0][value]' => $idMaximoPujador,
+        );
+        $obra = $this->drupalCreateNode($obra_contenido);
+        
+        return $obra;
+    }
+
+}
