@@ -24,7 +24,7 @@ class TestPujador extends DrupalWebTestCase {
     /**
      * Prueba que verifica que una obra pasa al estado vendido cuando se ha pujado y ha excedido el tiempo límite
      */
-    function notestObraVendida() {        
+    function testObraVendida() {        
         //Se crea una fecha límite anterior a la actual
         //Para provocar la actuación del cron
         $fechaLimite = getFechaAnterior();
@@ -42,7 +42,7 @@ class TestPujador extends DrupalWebTestCase {
     /**
      * Prueba que verifica que una obra pasa al estado no vendido cuando no se ha pujado y ha excedido el tiempo límite
      */
-    function notestObraNoVendida() {        
+    function testObraNoVendida() {        
         //Se crea una fecha límite anterior a la actual
         //Para provocar la actuación del cron
         $fechaLimite = getFechaAnterior();
@@ -61,7 +61,7 @@ class TestPujador extends DrupalWebTestCase {
     /**
      * Prueba que verifica que el estado de una obra no cambia cuando la fecha límite aún no ha excedido
      */
-    function notestObraNoExcedida() {        
+    function testObraNoExcedida() {        
         //Se crea una fecha límite posterior a la actual
         $fechaLimite = getFechaPosterior();
         debug($fechaLimite, 'Fecha Límite', true);
